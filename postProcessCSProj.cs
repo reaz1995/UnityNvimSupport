@@ -3,7 +3,7 @@ using System.Linq;
 using System.Xml.Linq;
 using UnityEditor;
 
-public class CS8032WarningFixer : AssetPostprocessor
+public class UnityBinaryReferencesForNvimFix : AssetPostprocessor
 {
     private static string OnGeneratedCSProject(string path, string content)
     {
