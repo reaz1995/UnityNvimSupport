@@ -7,10 +7,10 @@ public class UnityBinaryReferencesForNvimFix : AssetPostprocessor
 {
     private static string OnGeneratedCSProject(string path, string content)
     {
-        bool isNvim = true;
+        bool enable = true;
 
         var document = XDocument.Parse(content);
-        if (isNvim)
+        if (enable)
         {
             List<XElement> hintPaths = document.Root.Descendants().Where(x => x.Name.LocalName == "HintPath").ToList();
             foreach (XElement hintPath in hintPaths)
