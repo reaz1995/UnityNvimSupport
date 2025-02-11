@@ -10,6 +10,7 @@ Script "open_in_tmux_nvim.sh" - is a bash script that make Unity to open .cs scr
 Unity Package `com.unity.ide.visualstudio`
 
 # How to?
-1. Get those 2 .cs scripts in to your project, "sln_csproj_generator.cs" will generate up-to-date .csproj after each script compilation - `[InitializeOnLoad]`
-2. "csproj_references_for_wsl_fix.cs" will translate paths in .csproj from window to linux, so the references resolve correctly for nvim lsp.
-
+1. Get those 2 .cs scripts in to your project (`Assets/Editor`),
+    1. "sln_csproj_generator.cs" will generate up-to-date .csproj after each script compilation - `[InitializeOnLoad]`
+    2. "csproj_references_for_wsl_fix.cs" will automatically run `OnGeneratedCSProject`
+3. "csproj_references_for_wsl_fix.cs" will translate paths in .csproj from window to linux, so the references resolve correctly for nvim lsp.
