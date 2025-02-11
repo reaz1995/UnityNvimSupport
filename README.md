@@ -21,4 +21,8 @@ Scripts Compilation -> Domain Reload -> `[InitializeOnLoad]` -> Assets Import ->
 # Future development
 - [ ] Wrap this repo in to Unity Package
 
+# lsp support for newly created files .cs from nvim/terminal
+add line `<Compile Include="Assets\**\*.cs" />`,  in Assembly-CSharp.csproj, ofc in ItemGroup where other files are included 
+![image](https://github.com/user-attachments/assets/d8efb9f1-0591-4b0c-af8c-c8dae1aae3f9)
+
 
