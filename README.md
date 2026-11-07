@@ -47,7 +47,7 @@ flowchart LR
 **From git:** *Window → Package Manager → + → Add package from git URL…*
 
 ```
-https://github.com/<your-github-user>/UnityNvimSupport.git
+https://github.com/reaz1995/UnityNvimSupport.git
 ```
 
 **From disk:** *Window → Package Manager → + → Add package from disk…* and select this repository's `package.json`.

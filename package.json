@@ -15,8 +15,11 @@
     "ide"
   ],
   "author": {
-    "name": "Sebastian Langner"
+    "name": "Sebastian Langner",
+    "url": "https://github.com/reaz1995"
   },
+  "documentationUrl": "https://github.com/reaz1995/UnityNvimSupport#readme",
+  "changelogUrl": "https://github.com/reaz1995/UnityNvimSupport/blob/master/CHANGELOG.md",
   "dependencies": {
     "com.unity.ide.visualstudio": "2.0.22"
   }
