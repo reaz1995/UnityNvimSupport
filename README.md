@@ -1,218 +1,171 @@
-# Unity Nvim Support
+# Neovim Code Editor for Unity
 
-Script `csproj_references_for_wsl_fix.cs` simply translates paths references to binaries in .csproj from windows path to wsl/linux path.
+![Unity 2021.3+](https://img.shields.io/badge/Unity-2021.3%2B-black?logo=unity)
+![Neovim](https://img.shields.io/badge/Neovim-0.9%2B-57A143?logo=neovim&logoColor=white)
+![WSL](https://img.shields.io/badge/Windows-WSL%20%7C%20native-0078D4?logo=windows)
 
-Script `sln_csproj_generator.cs` auto generate .csproj files after scripts compilation.
+Use **Neovim** as Unity's External Script Editor, either natively (Windows, macOS, Linux) or **running inside WSL**.
 
-Script `open_in_tmux_nvim.sh` - is a bash script that make Unity to open .cs scripts in my nvim environment - its not ready to go solution for everybody, so use its as reference to write your own
-
-# Requirements:
-Unity Package `com.unity.ide.visualstudio`
-
-# How to?
-Place scripts: `sln_csproj_generator.cs` and `csproj_references_for_wsl_fix.cs` in to your project, those are Editor only scripts so its wise to put them under `Assets/Editor` or you will get errors in runtime. 
-- `sln_csproj_generator.cs` will generate up-to-date .csproj after each script compilation - in detail - every time the domain is reloaded - its bound to  `[InitializeOnLoad]`.
-- `csproj_references_for_wsl_fix.cs` will translate paths in .csproj from window to linux, so the references resolve correctly for nvim lsp - it executes as part of AssetPostprocessor.
-- `csproj_references_for_wsl_fix.cs` have hardcoded enable `bool enable = true;`, so be aware of it and apply changes if its required.
-
-Simplified events order:
-Scripts Compilation -> Domain Reload -> `[InitializeOnLoad]` -> Assets Import -> Assets Postprocessing.
-
-# Future development
-- [ ] Wrap this repo in to Unity Package
-
-# lsp support for newly created files .cs from nvim/terminal
-add line `<Compile Include="Assets\**\*.cs" />`,  in Assembly-CSharp.csproj, ofc in ItemGroup where other files are included 
-![image](https://github.com/user-attachments/assets/d8efb9f1-0591-4b0c-af8c-c8dae1aae3f9)
-
-# How To Set Up Roslyn lsp
-My setup:
-```
-wsl with Unbuntu22.04
-NVIM v0.10.2
-I use Mason for external tools for lsp, but Roslyn require to be set independently
-but works alongside mason
-```
-
-## 1. Install .NET 9 SDK
-
-Open your terminal and run:
-
-```bash
-sudo apt-get update
-sudo apt-get install -y software-properties-common
-```
-
-Then install the .NET 9 SDK:
-
-```bash
-sudo add-apt-repository ppa:dotnet/backports
-sudo apt-get update
-sudo apt-get install -y dotnet-sdk-9.0
-```
-
-Verify the installation:
-
-```bash
-dotnet --list-sdks
-```
-
-### Update Your Shell Environment (for zsh)
-
-Add these lines to your `~/.zshrc` (or your shell profile) so that `dotnet` and MSBuild are properly set:
-
-```bash
-export DOTNET_ROOT=/usr/lib/dotnet
-export MSBuildSDKsPath="${DOTNET_ROOT}/sdk/9.0.103/Sdks"
-```
-
-Then reload your shell:
-
-```bash
-source ~/.zshrc
-```
+Double-click a script or a Console error and the file opens in your running Neovim at the right line and column. Unity keeps the `.sln` / `.csproj` files up to date, so Roslyn LSP (`roslyn.nvim`) has full IntelliSense for your project, including files you create from Neovim.
 
 ---
 
-## 2. Download and Unpack Roslyn
+## Features
 
-### Download Roslyn for Linux
+- **Real External Script Editor:** select *Neovim* or *Neovim (WSL)* in Preferences. No wrapper scripts.
+- **Opens files in the running Neovim:** Unity talks to nvim over its RPC socket, so the file opens in the same instance at the exact line and column.
+- **Launches Neovim when needed:** if Neovim isn't running, one is started in Windows Terminal, a tmux session, or a terminal command you choose.
+- **One instance per project:** each Unity project gets its own Neovim on its own port.
+- **Your shell environment:** in WSL, Neovim starts through your login shell, so `PATH`, `DOTNET_ROOT` and the rest of your `.zshrc` / `.bashrc` are set for Roslyn.
+- **Project files stay current:** Unity's official generator (`com.unity.ide.visualstudio`) updates them whenever scripts, asmdefs or packages change.
+- **WSL path conversion:** absolute Windows paths in the `.csproj` files (references, analyzers, `\\wsl$\…`) are rewritten to `/mnt/c/…`.
+- **New files get LSP right away:** a wildcard `<Compile Include="…/**/*.cs"/>` is added for each assembly. It follows asmdef/asmref, `Editor` and `Plugins` folder rules, so files created outside Unity work before Unity recompiles.
 
-Download the package from:
+## How it works
 
-- **Linux:**  
-    [https://dev.azure.com/azure-public/vside/_artifacts/feed/vs-impl/NuGet/Microsoft.CodeAnalysis.LanguageServer.linux-x64/overview/5.0.0-1.25111.6](https://dev.azure.com/azure-public/vside/_artifacts/feed/vs-impl/NuGet/Microsoft.CodeAnalysis.LanguageServer.linux-x64/overview/5.0.0-1.25111.6)
-
-Or navigate to:
-
-- **Azure DevOps Artifact Feed:**  
-    Go to `https://dev.azure.com/azure-public/vside/_artifacts/feed/vs-impl` and look for `Microsoft.CodeAnalysis.LanguageServer`, then select the Linux-x64 version and click download.
-
-### Unzip and Install Roslyn
-
-Run these commands in your terminal (in WSL):
-
-```bash
-# Create the target directory for Roslyn
-mkdir -p ~/.local/share/nvim/roslyn
-cd ~/.local/share/nvim/roslyn
-
-# Move your downloaded .nupkg to this folder and rename it (adjust <path_of_downloaded .nupkg> accordingly)
-mv <path_of_downloaded .nupkg> roslyn.nupkg
-
-# Unzip the .nupkg file into a temporary folder
-unzip roslyn.nupkg -d roslyn_extracted
-
-# Move the contents of the Linux-x64 folder to the current directory
-mv roslyn_extracted/content/LanguageServer/linux-x64/* .
-
-# Clean up the extracted folder and the original .nupkg file
-rm -r roslyn_extracted roslyn.nupkg
+```mermaid
+flowchart LR
+    A[Double-click script<br/>in Unity] --> B{Neovim listening on<br/>127.0.0.1:PORT?}
+    B -- yes --> C[RPC: open file,<br/>jump to line:col]
+    B -- no --> D[Launch nvim --listen<br/>in Terminal / tmux / custom]
+    E[Scripts / asmdefs change] --> F[Regenerate .sln/.csproj]
+    F --> G[Convert paths for WSL<br/>+ add wildcard Compile items]
+    G --> H[roslyn.nvim]
 ```
 
-Test the installation by running:
+## Requirements
 
-```bash
-dotnet Microsoft.CodeAnalysis.LanguageServer.dll --version
+| | |
+|---|---|
+| Unity | 2021.3 or newer |
+| Packages | `com.unity.ide.visualstudio` (installed automatically) |
+| Neovim | 0.9+, native or inside WSL |
+| LSP (optional) | .NET SDK + [roslyn.nvim](https://github.com/seblyng/roslyn.nvim), see [Roslyn setup](Documentation~/roslyn-setup.md) |
+
+## Installation
+
+**From git:** *Window → Package Manager → + → Add package from git URL…*
+
+```
+https://github.com/<your-github-user>/UnityNvimSupport.git
 ```
 
-You should see a version number printed.
+**From disk:** *Window → Package Manager → + → Add package from disk…* and select this repository's `package.json`.
 
----
+> If you used the old loose scripts (`sln_csproj_generator.cs`, `csproj_references_for_wsl_fix.cs`), delete them from your project's `Assets/Editor`. Otherwise paths get converted twice.
 
-## 3. Extend File-Watching Limits in Ubuntu
+## Quick start
 
-For Unity projects, you may need to increase the number of files the OS can watch. Check your current limits:
+1. Open *Edit → Preferences → External Tools*.
+2. Set **External Script Editor** to:
+   - **Neovim (WSL):** Neovim inside WSL.
+   - **Neovim:** native `nvim` / `nvim.exe`, found on `PATH` or via Scoop, winget, Chocolatey, Homebrew and others. If it isn't listed, use *Browse…*.
+3. **WSL only:** set **WSL distribution** to the distro where Neovim is installed (for example `Ubuntu`). The default distro is not always the right one; check with `wsl -l -v`.
+4. Click **Regenerate project files**.
+5. Double-click any script.
 
-```bash
-cat /proc/sys/fs/inotify/max_user_instances
-cat /proc/sys/fs/inotify/max_user_watches
-ulimit -n
+*Assets → Open C# Project* or *Tools → Neovim → Open Project in Neovim* opens Neovim in the project root.
+
+## Launch modes
+
+These control how a *new* Neovim is started. Once one is running, files always go to it.
+
+| Mode | Behaviour |
+|---|---|
+| **Terminal** | **Windows:** a tab named `nvim - <Project>` in a Windows Terminal window called `nvim-unity`, or a console window if Windows Terminal isn't installed.<br/>**macOS:** Terminal.app.<br/>**Linux:** `$TERMINAL`, `x-terminal-emulator`, kitty, wezterm, alacritty, gnome-terminal, konsole or xterm, whichever is found first. |
+| **Tmux** | A window named `nvim` in the configured session. The session is created detached if it doesn't exist (`tmux attach -t unity`). WSL / macOS / Linux. |
+| **Custom** | Any command, with the placeholders `{nvimCommand}`, `{file}`, `{line}`, `{column}`, `{project}`, `{listen}`. |
+
+Custom examples:
+
+```sh
+wezterm start --cwd "{project}" -- {nvimCommand}
+alacritty -e {nvimCommand}
 ```
 
-Temporarily increase them:
+### Connecting your own Neovim
 
-```bash
-sudo sysctl -w fs.inotify.max_user_instances=512
-sudo sysctl -w fs.inotify.max_user_watches=524288
+Any Neovim that listens on the project's port receives files from Unity. Preferences shows the port:
+
+```sh
+nvim --listen 127.0.0.1:<port>
 ```
 
-To make these changes permanent, add the following lines to `/etc/sysctl.conf`:
+## Settings
 
-```bash
-echo "fs.inotify.max_user_instances=512" | sudo tee -a /etc/sysctl.conf
-echo "fs.inotify.max_user_watches=524288" | sudo tee -a /etc/sysctl.conf
-sudo sysctl -p
+All settings are under *Preferences → External Tools* while Neovim is selected. They are saved per user.
+
+| Setting | Default | Description |
+|---|---|---|
+| Launch new Neovim in | Terminal | See [Launch modes](#launch-modes) |
+| Focus Windows Terminal | on | Bring the Neovim window to the front when a file is opened |
+| RPC port | auto | `0` derives a stable port from the project path |
+| Extra nvim arguments | – | Added to the launch command, e.g. `-c "Neotree show"` |
+| nvim command | `nvim` | Executable used by the WSL / tmux launch script |
+| WSL distribution | default | Distro that has Neovim installed |
+| WSL mount root | `/mnt/` | Must match `[automount] root` in `/etc/wsl.conf` |
+| Convert .csproj paths to WSL | on | Rewrites `C:\…` to `/mnt/c/…` |
+| Add wildcard Compile items | on | New `.cs` files get LSP support immediately |
+| Regenerate after every domain reload | off | Full regeneration after each reload; normally updates are incremental |
+| SDK-style projects | off | Use the SDK-style generator of the Visual Studio package |
+| Generate .csproj files for | – | Package filters: embedded, local, registry, git, … |
+| Verbose logging | off | Log every launch / RPC call to the Console |
+
+## Troubleshooting
+
+<details>
+<summary><b>"nvim was not found" in the terminal</b></summary>
+
+The launch script ran in a WSL distro without Neovim, or `nvim` isn't on your login shell's `PATH`. Set **WSL distribution** (for example `Ubuntu`), or set **nvim command** to the full path (`which nvim` inside WSL).
+</details>
+
+<details>
+<summary><b>A new Neovim opens every time</b></summary>
+
+Unity can't reach the RPC port. Turn on *Verbose logging* and check:
+- In WSL, `localhostForwarding` must not be disabled in `%UserProfile%\.wslconfig`.
+- The port may be reserved by Hyper-V. Check with `netsh interface ipv4 show excludedportrange protocol=tcp` and choose another port.
+</details>
+
+<details>
+<summary><b>Neovim starts tmux / does something odd on launch</b></summary>
+
+Neovim is started with `$SHELL -lic`, which loads your `.zshrc` / `.bashrc`. If your shell rc auto-starts tmux, guard it, for example `[ -z "$TMUX" ] && [ -z "$NVIM" ] && …`.
+</details>
+
+<details>
+<summary><b>LSP doesn't see new files or references</b></summary>
+
+- Make sure *Add wildcard Compile items* is on, then click **Regenerate project files**.
+- Make sure roslyn.nvim has file watching enabled (`filewatching = "roslyn"` or `"auto"`).
+- In WSL, raise the inotify limits (see [Roslyn setup](Documentation~/roslyn-setup.md#4-file-watching-limits-linux--wsl)).
+</details>
+
+<details>
+<summary><b>Project files still contain Windows paths</b></summary>
+
+Path conversion only runs while **Neovim (WSL)** is selected. That way, switching back to Visual Studio or Rider gives normal project files. Select it, then regenerate.
+</details>
+
+## Security note
+
+Neovim's RPC port listens on `127.0.0.1` only, but any process on your machine can connect to it. Avoid using this on shared machines you don't trust.
+
+## Package layout
+
+```
+package.json
+Editor/
+  NvimCodeEditor.cs        External Script Editor registration (IExternalCodeEditor)
+  NvimLauncher.cs          Open via RPC, or launch Terminal / tmux / custom
+  NvimRpc.cs               Minimal msgpack-RPC client (nvim_exec_lua over TCP)
+  ProjectFiles.cs          Drives the Visual Studio package's .sln/.csproj generator
+  CsprojPostprocessor.cs   WSL path conversion + wildcard Compile items
+  NvimPreferencesGUI.cs    Preferences UI
+  NvimSettings.cs          EditorPrefs-backed settings
+  PathUtility.cs, ProcessUtility.cs
+Documentation~/
+  roslyn-setup.md          .NET SDK, Roslyn LSP and roslyn.nvim setup
 ```
 
----
-
-## 4. Neovim Plugin Configuration for Roslyn
-
-Place this configuration in your Neovim config (e.g., in your Lua config file):
-https://github.com/seblyng/roslyn.nvim
-```lua
-return {
-  "seblyng/roslyn.nvim",
-  autostart = true,
-  ft = "cs",
-  config = {
-    settings = {
-      ["csharp|background_analysis"] = {
-        background_analysis = {
-          dotnet_analyzer_diagnostics_scope = "fullSolution",
-          dotnet_compiler_diagnostics_scope = "fullSolution",
-        }
-      }
-    }
-  },
-  exe = {
-    "dotnet",
-    vim.fs.joinpath(vim.fn.stdpath("data"), "roslyn", "Microsoft.CodeAnalysis.LanguageServer.dll"),
-  },
-  filewatching = true,
-  capabilities = function()
-    local capabilities = require("cmp_nvim_lsp").default_capabilities()
-
-    capabilities = vim.tbl_deep_extend("force", capabilities, {
-      textDocument = {
-        foldingRange = {
-          dynamicRegistration = true,
-          lineFoldingOnly = true,
-        },
-        completion = {
-          completionItem = {
-            snippetSupport = true,
-          },
-        },
-      },
-      workspace = {
-        didChangeWatchedFiles = {
-          dynamicRegistration = true,
-        },
-      },
-    })
-    return capabilities
-  end,
-  root_dir = require("lspconfig").util.root_pattern("package.json", "yarn.lock", "tsconfig.json", ".git"),
-}
-```
-
-Add this line somewhere in your nvim config to prevent bloating LspLog.
-```lua
-vim.lsp.set_log_level("error")
-```
-
----
-
-## 5. .csproj Workaround for LSP Support
-To ensure that your LSP picks up new C# files automatically, add the following to your `Assembly-CSharp.csproj`:
-
-(This will be add to auto generate in .csproj on compile in future)
-```xml
-# Look for item group that includes Compile elements, then add it here
-  <Compile Include="Assets\**\*.cs">
-```
-
-## Summary:
-Roslyn should start in 10 sec for unity project, then with this set up it will work for any newly created file via terminal in this project.
+See [CHANGELOG.md](CHANGELOG.md) for release notes.
